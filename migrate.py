@@ -11,6 +11,7 @@ import logging
 import json
 from simplediff import diff
 
+
 """ Yes or no prompting """
 def yes_no(question):
     yes = set(['yes','y'])
@@ -140,12 +141,12 @@ def import_accounts(authtoken, url, accountsJson):
     logging.info('All accounts successfully imported')
 
 """
-Given a UCP authtoken, and two json dumps, one which is the stale json obtained
-from get_accounts() and the second which is freshly obtained using the authtoken
-again the UCP where import_accounts() was just ran, diff the json dumps to
-ensure all accounts were actually copied over.
+Given a UCP url, authtoken, and two json dumps, one which is the staleJson
+obtained from get_accounts() and the second which is freshly obtained using
+the authtoken against the UCP where import_accounts() was just ran, diff the
+json dumps to ensure all accounts were actually copied over.
 """
-def verify_import(authtoken, oldAccountsJson, newAccountsJson):
+def verify_import(authtoken, url, staleJson):
 
 def main():
     # argument parsing
