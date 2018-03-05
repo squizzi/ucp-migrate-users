@@ -7,7 +7,8 @@ WORKDIR /migrate/
 RUN pip install --upgrade \
     pip \
     requests \
-    colored
+    colored \
+    simplediff
 
 COPY . /migrate/
 
