@@ -202,15 +202,15 @@ def main():
                         dest="ucpPasswordOne",
                         help="UCP admin password to use for the --from UCP")
     parser.add_argument("--ucp-to-user",
-                        dest="ucpUserOne",
+                        dest="ucpUserTwo",
                         help="UCP admin username to use for the --to UCP")
     parser.add_argument("--ucp-to-password",
-                        dest="ucpPasswordOne",
+                        dest="ucpPasswordTwo",
                         help="UCP admin password to use for the --to UCP")
     parser.add_argument("-P",
                         "--user-password",
                         dest="userPassword",
-                        help="The default password on newly imported user ")
+                        help="The default password on newly imported users")
     parser.add_argument("--skip-user-verify",
                         dest="skipVerify",
                         action="store_true",
@@ -236,16 +236,31 @@ def main():
                             level=logging.DEBUG)
 
     # Ask user whether we should enter interactiveMode or not
-    if interactiveMode:
+    if args.interactiveMode:
         # build a list of inputs from the arguments and apply those to
         # the argparse vars for backwards compatability
-        args.ucpOne = raw_input('Enter UCP where accounts will be copied FROM:')
-        args.ucpUserOne = raw_input('UCP admin username:')
-        args.ucpPasswordOne = getpass.getpass('UCP admin password')
-        args.ucpTwo = raw_input('Enter UCP where accounts will be copied TO:')
-        args.ucpUserTwo = raw_input('UCP admin username:')
-        args.ucpPasswordTwo = getpass.getpass('UCP admin password')
-        args.userPassword = raw_input('Enter the default password for imported user accounts:')
+        args.ucpOne = raw_input('Enter UCP where accounts will be copied FROM: ')
+        args.ucpUserOne = raw_input('UCP admin username: ')
+        args.ucpPasswordOne = getpass.getpass('UCP admin password: ')
+        args.ucpTwo = raw_input('Enter UCP where accounts will be copied TO: ')
+        args.ucpUserTwo = raw_input('UCP admin username: ')
+        args.ucpPasswordTwo = getpass.getpass('UCP admin password: ')
+        args.userPassword = raw_input('Enter the default password for imported user accounts: ')
+    else:
+        # Verify the arguments above have been filled via flags
+        if (
+        args.ucpOne
+        or args.ucpUserOne
+        or args.ucpPasswordOne
+        or args.ucpTwo
+        or args.ucpUserTwo
+        or args.ucpPasswordTwo
+        or args.userPassword
+        ) == None:
+            logging.error('Flags: --ucp-from, --ucp-to, --ucp-from-user, --ucp-from-password, --ucp-to-user, --ucp-to-password, -P are all required.')
+            logging.info('Use -i for interactive mode if you do not wish to pass flags')
+            parser.print_help()
+            sys.exit(1)
     # If the user didn't prepend https:// to their UCP fqdn's we'll do it for
     # them
     if not "https://" in args.ucpOne:
