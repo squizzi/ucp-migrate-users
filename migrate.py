@@ -71,7 +71,6 @@ def get_token(username, password, url, retries=0):
         retries+=1
         retry_this('UCP', 10, retries, 3, get_token(username, password, url))
     a = json.loads(r.text)
-    logging.debug('Got response: {}'.format(a))
     token = str(a["auth_token"])
     return token
 
@@ -133,10 +132,28 @@ def import_accounts(authtoken, url, accountsJson):
     x = 0
     for item in accountsJson["accounts"]:
         toImport = accountsJson["accounts"][x]
+        # Grab just the account name for logging use later
+        accountName = toImport["name"]
         # Get the extracted JSON into a format we can send via an HTTP request
         # that UCP will accept
-        str(toImport).replace("u'", '"').replace("'", '"')
-        logging.debug('Imported: {}'.format(toImport["name"]))
+        try:
+            r = requests.post(
+                url+'/accounts/',
+                headers=headers,
+                json=json.dumps(toImport),
+                verify=False)
+        # If the account already exists just pass, but tell the user
+        except requests.exceptions.HTTPError as e:
+            if e.code == 404:
+                coolbeans
+        # If we get any form of timeout we'll just retry
+        except requests.exceptions.ConnectTimeout as e:
+            logging.error('Failed to add {0} account to UCP {1}: {2}'.format(
+                                                                      accountName,
+                                                                      url, e))
+            retries+=1
+            retry_this('UCP', 10, retries, 3, import_accounts(authtoken, url, accountsJson))
+        logging.debug('Imported: {}'.format(accountName))
         x+=1
     logging.info('All accounts successfully imported')
 
