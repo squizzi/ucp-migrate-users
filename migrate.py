@@ -247,22 +247,20 @@ def main():
         args.ucpUserTwo = raw_input('UCP admin username: ')
         args.ucpPasswordTwo = getpass.getpass('UCP admin password: ')
         args.userPassword = raw_input('Enter the default password for imported user accounts: ')
-    else:
-        # Verify the arguments above have been filled via flags
-        if (
-        args.ucpOne
-        or args.ucpUserOne
-        or args.ucpPasswordOne
-        or args.ucpTwo
-        or args.ucpUserTwo
-        or args.ucpPasswordTwo
-        or args.userPassword
-        ) == None:
-            logging.info('Flags: --ucp-from, --ucp-to, --ucp-from-user, --ucp-from-password, --ucp-to-user, --ucp-to-password, -P are all required unless interactive mode is used.\n')
-            parser.print_help()
-            sys.exit(1)
     # If the user didn't prepend https:// to their UCP fqdn's we'll do it for
     # them
+    if None in (
+        args.ucpOne,
+        args.ucpUserOne,
+        args.ucpPasswordOne,
+        args.ucpTwo,
+        args.ucpUserTwo,
+        args.ucpPasswordTwo,
+        args.userPassword
+        ):
+        logging.info('Flags: --ucp-from, --ucp-to, --ucp-from-user, --ucp-from-password, --ucp-to-user, --ucp-to-password, -P are all required unless interactive mode is used.\n')
+        parser.print_usage()
+        sys.exit(1)
     if not "https://" in args.ucpOne:
         args.ucpOne = "https://" + args.ucpOne
     if not "https://" in args.ucpTwo:
