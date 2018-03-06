@@ -210,7 +210,8 @@ def main():
     parser.add_argument("-P",
                         "--user-password",
                         dest="userPassword",
-                        help="The default password on newly imported users")
+                        help="The default password on newly imported user \
+                        accounts.")
     parser.add_argument("--skip-user-verify",
                         dest="skipVerify",
                         action="store_true",
@@ -226,7 +227,7 @@ def main():
     args = parser.parse_args()
 
     # basic logging
-    if args.debug == False:
+    if not args.debug:
         logger = logging.getLogger(name=None)
         logging.basicConfig(format='%(levelname)s: %(message)s',
                             level=logging.INFO)
@@ -257,8 +258,7 @@ def main():
         or args.ucpPasswordTwo
         or args.userPassword
         ) == None:
-            logging.error('Flags: --ucp-from, --ucp-to, --ucp-from-user, --ucp-from-password, --ucp-to-user, --ucp-to-password, -P are all required.')
-            logging.info('Use -i for interactive mode if you do not wish to pass flags')
+            logging.info('Flags: --ucp-from, --ucp-to, --ucp-from-user, --ucp-from-password, --ucp-to-user, --ucp-to-password, -P are all required unless interactive mode is used.\n')
             parser.print_help()
             sys.exit(1)
     # If the user didn't prepend https:// to their UCP fqdn's we'll do it for
