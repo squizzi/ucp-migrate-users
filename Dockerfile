@@ -2,7 +2,7 @@ FROM jfloff/alpine-python:2.7-slim
 
 MAINTAINER Kyle Squizzato: 'kyle.squizzato@docker.com'
 
-WORKDIR /migrate/
+WORKDIR /
 
 RUN pip install --upgrade \
     pip \
@@ -10,6 +10,6 @@ RUN pip install --upgrade \
     colored \
     jsondiff
 
-COPY . /migrate/
+COPY ./migrate.py /
 
-ENTRYPOINT /migrate/migrate.py
+ENTRYPOINT ["python", "./migrate.py"]
