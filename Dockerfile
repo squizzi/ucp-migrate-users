@@ -8,7 +8,7 @@ RUN pip install --upgrade \
     pip \
     requests \
     colored \
-    simplediff
+    jsondiff
 
 COPY . /migrate/
 
