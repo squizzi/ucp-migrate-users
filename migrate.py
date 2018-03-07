@@ -63,12 +63,6 @@ def retry_this(componentName, retrySecs, retries, maxAttempts=1,
         logging.info("Attempting to reconnect to {0} -- retry {1} of {2}".format(componentName, retries, maxAttempts))
 
 """
-Log when we exit
-"""
-def exit_handler():
-    logging.info('Exited!')
-
-"""
 Get and return an authtoken from a given UCP URL
 """
 def get_token(username, password, url, retries=0):
@@ -83,8 +77,16 @@ def get_token(username, password, url, retries=0):
         logging.error('Failed to authenticate with UCP {0}: {1}'.format(url, e))
         retries+=1
         retry_this('UCP', 10, retries, 3, get_token(username, password, url))
+    logging.debug('Got response: {}'.format(r.text))
+    if "unauthorized" in r.text:
+        logging.error('Unable to authenticate with UCP {}, are the admin credentials correct?'.format(url))
+        sys.exit(1)
     a = json.loads(r.text)
-    token = str(a["auth_token"])
+    try:
+        token = str(a["auth_token"])
+    except KeyError:
+        logging.error('No authtoken was received from UCP {0}'.format(url))
+        sys.exit(1)
     return token
 
 """
@@ -173,6 +175,7 @@ obtained from get_accounts() and the second which is freshly obtained using
 the authtoken against the UCP where import_accounts() was just ran, diff the
 json dumps to ensure all accounts were actually copied over.
 """
+##FIXME: This is currently unreliable, need to fix this for a future release
 def verify_import(authtoken, url, staleJson, customFilter='all'):
     headers = {"Authorization":"Bearer {0}".format(authtoken)}
     freshJson = get_accounts(authtoken, url, customFilter, verifyUser=False)
@@ -316,8 +319,6 @@ def main():
     ucpTwoAuthToken = get_token(args.ucpUserTwo, args.ucpPasswordTwo, args.ucpTwo)
     # Import accounts into the --to UCP
     import_accounts(ucpTwoAuthToken, args.ucpTwo, ucpOneAccountJson, args.userPassword)
-    # Verify that everything looks good
-    verify_import(ucpTwoAuthToken, args.ucpTwo, ucpOneAccountJson)
     # Tell the user we're done
     logging.info('Complete.')
 
@@ -325,5 +326,4 @@ def main():
 Main
 """
 if __name__ == '__main__':
-    atexit.register(exit_handler)
     sys.exit(main())
