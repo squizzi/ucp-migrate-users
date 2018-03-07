@@ -11,8 +11,8 @@ docker run --rm -it squizzi/ucp-migrate-users -i
 ### Non-Interactive Mode
 ~~~
 docker run --rm -it squizzi/ucp-migrate-users \
---ucp-from ucp1.example.com \
---ucp-to ucp2.example.com \
+--ucp-from https://ucp1.example.com \
+--ucp-to https://ucp2.example.com \
 --ucp-from-user admin \
 --ucp-from-password foobar \
 --ucp-to-user admin \

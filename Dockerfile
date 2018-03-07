@@ -8,7 +8,8 @@ RUN pip install --upgrade \
     pip \
     requests \
     colored \
-    jsondiff
+    jsondiff \
+    validators
 
 COPY ./migrate.py /
 

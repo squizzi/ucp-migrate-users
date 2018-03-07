@@ -10,9 +10,14 @@ import requests
 import logging
 import json
 import getpass
+import validators
+import atexit
 from jsondiff import diff
 from time import sleep
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
+
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 """ Yes or no prompting """
 def yes_no(question):
@@ -58,6 +63,12 @@ def retry_this(componentName, retrySecs, retries, maxAttempts=1,
         logging.info("Attempting to reconnect to {0} -- retry {1} of {2}".format(componentName, retries, maxAttempts))
 
 """
+Log when we exit
+"""
+def exit_handler():
+    logging.info('Exited!')
+
+"""
 Get and return an authtoken from a given UCP URL
 """
 def get_token(username, password, url, retries=0):
@@ -81,22 +92,22 @@ Get a JSON dump of users or orgs from a given UCP URL, facilitated by the
 /accounts/ endpoint.  Use customFilter for custom filters, if desired, else
 we will just pull 'all'.
 
-Then, ask the user to verify if the pulled information looks sane.
+Then, ask the user to verify if the pulled information looks sane if True.
 """
-def get_accounts(authtoken, url, customFilter='all', verifyUser=True):
+def get_accounts(authtoken, url, customFilter='all', verifyUser=False):
     headers = {"Authorization":"Bearer {0}".format(authtoken)}
-    logging.info('Generating a list of {0} from {1}...'.format(filters, url))
+    logging.info('Generating a list of accounts from {0}...'.format(url))
     # Make the request
     try:
         r = requests.get(
-            '{0}/accounts/?filter={1}'.format(url, filters),
+            '{0}/accounts/?filter={1}'.format(url, customFilter),
             headers=headers,
             verify=False
         )
     except requests.exceptions.RequestException as e:
         logging.error('Failed to get account list for UCP {0}: {1}'.format(url, e))
         retries+=1
-        retry_this('UCP', 10, retries, 3, get_accounts(authtoken, url, users, customFilter, verifyUser))
+        retry_this('UCP', 10, retries, 3, get_accounts(authtoken, url, customFilter, verifyUser))
     logging.info('Getting ready to import the following accounts:\n{}'.format(r.text))
     # Using the captured information send a list of captured accounts out to
     # the user
@@ -113,37 +124,38 @@ def get_accounts(authtoken, url, customFilter='all', verifyUser=True):
             sys.exit(1)
     else:
         logging.info('verifyUser flag False, skipping account list verification...')
+        return a
 
 """
-Import a given JSON dump of accounts into a given UCP URL.
+Import a given JSON dump of accounts into a given UCP URL.  Give users a
+default password of 'changeme'.  Password is configurable.
 """
-def import_accounts(authtoken, url, accountsJson, userPassword):
+def import_accounts(authtoken, url, accountsJson, userPassword='changeme'):
     headers = {
         "Authorization":"Bearer {0}".format(authtoken),
         "Content-Type":"application/json"
     }
-    logging.info('Importing {0}... to {1}'.format(filters, url))
-    # Give each user a default configurable userPassword
-    if userPassword == None:
-        userPassword = 'changeme'
+    logging.info('Importing accounts to {0}'.format(url))
     # Iterate through the accounts schema and import each one
     x = 0
     for item in accountsJson["accounts"]:
         # If the account is a user, update the dict with the password entry
-        if accountsJson["accounts"][x]["isOrg"] == False:
-            toImport = accountsJson["accounts"][x].update({u'password': userPassword})
-        else:
-            toImport = accountsJson["accounts"][x]
+        password_dict = {
+            "password":"{0}".format(userPassword)
+        }
+        if not accountsJson["accounts"][x]["isOrg"]:
+            accountsJson["accounts"][x].update(password_dict)
         # Get the extracted JSON into a format we can send via an HTTP request
         # that UCP will accept
+        toImport = json.dumps(accountsJson["accounts"][x])
         # Grab just the account name for logging use later
-        accountName = toImport["name"]
+        accountName = str(toImport["name"])
         # Add the account to the UCP
         try:
             r = requests.post(
                 url+'/accounts/',
                 headers=headers,
-                data=json.dumps(toImport),
+                data=toImport,
                 verify=False)
         # If we get any form of exception from requests we'll just retry
         except requests.exceptions.RequestException as e:
@@ -212,11 +224,6 @@ def main():
                         dest="userPassword",
                         help="The default password on newly imported user \
                         accounts.")
-    parser.add_argument("--skip-user-verify",
-                        dest="skipVerify",
-                        action="store_true",
-                        help="Skip user verification of pulled account list \
-                        from the --from UCP.")
     parser.add_argument("-D",
                         "--debug",
                         dest="debug",
@@ -236,19 +243,58 @@ def main():
         logging.basicConfig(format='%(levelname)s: %(message)s',
                             level=logging.DEBUG)
 
+    """
+    Flag Verification
+    """
     # Ask user whether we should enter interactiveMode or not
     if args.interactiveMode:
         # build a list of inputs from the arguments and apply those to
         # the argparse vars for backwards compatability
-        args.ucpOne = raw_input('Enter UCP where accounts will be copied FROM: ')
-        args.ucpUserOne = raw_input('UCP admin username: ')
-        args.ucpPasswordOne = getpass.getpass('UCP admin password: ')
-        args.ucpTwo = raw_input('Enter UCP where accounts will be copied TO: ')
-        args.ucpUserTwo = raw_input('UCP admin username: ')
-        args.ucpPasswordTwo = getpass.getpass('UCP admin password: ')
-        args.userPassword = raw_input('Enter the default password for imported user accounts: ')
-    # If the user didn't prepend https:// to their UCP fqdn's we'll do it for
-    # them
+        while True:
+            args.ucpOne = raw_input('Enter UCP where accounts will be copied FROM: ')
+            if not validators.url(args.ucpOne):
+                logging.error('Please enter a valid UCP URL (ex. https://example.com).')
+            else:
+                break
+        while True:
+            args.ucpUserOne = raw_input('UCP admin username: ')
+            if not validators.length(args.ucpUserOne, min=1):
+                logging.error('Please enter an admin username.')
+            else:
+                break
+        while True:
+            args.ucpPasswordOne = getpass.getpass('UCP admin password: ')
+            if not validators.length(args.ucpPasswordOne, min=8):
+                logging.error('Please enter a valid password.')
+            else:
+                break
+        while True:
+            args.ucpTwo = raw_input('Enter UCP where accounts will be copied TO: ')
+            if not validators.url(args.ucpTwo):
+                logging.error('Please enter a valid UCP URL (ex. https://example.com).')
+            else:
+                break
+        while True:
+            args.ucpUserTwo = raw_input('UCP admin username: ')
+            if not validators.length(args.ucpUserTwo, min=1):
+                logging.error('Please enter an admin username.')
+            else:
+                break
+        while True:
+            args.ucpPasswordTwo = getpass.getpass('UCP admin password: ')
+            if not validators.length(args.ucpPasswordTwo, min=8):
+                logging.error('Please enter a valid password.')
+            else:
+                break
+        while True:
+            args.userPassword = raw_input('Enter the default password for imported user accounts (8 or more characters): ')
+            if not validators.length(args.userPassword, min=8):
+                logging.error('Please enter a password that is 8 characters or longer.')
+            else:
+                break
+        # if we're in interactiveMode we verifyUser=True, else we'll skip
+        # user verification
+        verify = True
     if None in (
         args.ucpOne,
         args.ucpUserOne,
@@ -261,14 +307,14 @@ def main():
         logging.info('Flags: --ucp-from, --ucp-to, --ucp-from-user, --ucp-from-password, --ucp-to-user, --ucp-to-password, -P are all required unless interactive mode is used.\n')
         parser.print_usage()
         sys.exit(1)
-    if not "https://" in args.ucpOne:
-        args.ucpOne = "https://" + args.ucpOne
-    if not "https://" in args.ucpTwo:
-        args.ucpTwo = "https://" + args.ucpTwo
+
+    """
+    Account import
+    """
     # Get an auth token against the --from UCP
     ucpOneAuthtoken = get_token(args.ucpUserOne, args.ucpPasswordOne, args.ucpOne)
     # Get a list of accounts against the --from UCP
-    ucpOneAccountJson = get_accounts(ucpOneAuthtoken, args.ucpOne, verifyUser=args.skipVerify)
+    ucpOneAccountJson = get_accounts(ucpOneAuthtoken, args.ucpOne, verifyUser=verify)
     # Get an auth token against the --to UCP
     ucpTwoAuthToken = get_token(args.ucpUserTwo, args.ucpPasswordTwo, args.ucpTwo)
     # Import accounts into the --to UCP
@@ -282,4 +328,5 @@ def main():
 Main
 """
 if __name__ == '__main__':
+    atexit.register(exit_handler)
     sys.exit(main())
