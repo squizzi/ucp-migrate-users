@@ -136,26 +136,21 @@ def import_accounts(authtoken, url, accountsJson, userPassword='changeme'):
         "Content-Type":"application/json"
     }
     logging.info('Importing accounts to {0}'.format(url))
+    # Setup a default password for users
+    password_dict = {u'password':u'{0}'.format(userPassword)}
     # Iterate through the accounts schema and import each one
-    x = 0
-    for item in accountsJson["accounts"]:
-        # If the account is a user, update the dict with the password entry
-        password_dict = {
-            "password":"{0}".format(userPassword)
-        }
+    for x in range(len(accountsJson["accounts"])):
         if not accountsJson["accounts"][x]["isOrg"]:
             accountsJson["accounts"][x].update(password_dict)
-        # Get the extracted JSON into a format we can send via an HTTP request
-        # that UCP will accept
-        toImport = json.dumps(accountsJson["accounts"][x])
+        toImport = accountsJson["accounts"][x]
         # Grab just the account name for logging use later
-        accountName = str(toImport["name"])
+        accountName = toImport["name"]
         # Add the account to the UCP
         try:
             r = requests.post(
                 url+'/accounts/',
                 headers=headers,
-                data=toImport,
+                data=json.dumps(toImport),
                 verify=False)
         # If we get any form of exception from requests we'll just retry
         except requests.exceptions.RequestException as e:
@@ -166,7 +161,9 @@ def import_accounts(authtoken, url, accountsJson, userPassword='changeme'):
         if "ACCOUNT_EXISTS" in r.text:
             logging.info('Cannot import {0}, account already exists'.format(accountName))
             logging.debug(r.text)
-        logging.debug('Imported: {}'.format(accountName))
+            pass
+        logging.info('Imported: {}'.format(accountName))
+        logging.debug(toImport)
         x+=1
     logging.info('All accounts successfully imported')
 
