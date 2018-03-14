@@ -102,7 +102,7 @@ def get_accounts(authtoken, url, customFilter='all', verifyUser=False):
     # Make the request
     try:
         r = requests.get(
-            '{0}/accounts/?filter={1}'.format(url, customFilter),
+            '{0}/accounts/?filter={1}&limit=1000'.format(url, customFilter),
             headers=headers,
             verify=False
         )
