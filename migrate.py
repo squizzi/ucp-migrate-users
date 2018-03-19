@@ -90,42 +90,39 @@ def get_token(username, password, url, retries=0):
     return token
 
 """
-Get a JSON dump of users or orgs from a given UCP URL, facilitated by the
-/accounts/ endpoint.  Use customFilter for custom filters, if desired, else
-we will just pull 'all'.
-
-Then, ask the user to verify if the pulled information looks sane if True.
+Get a JSON dump of a specific API endpoint from a given UCP URL. Then, ask the
+user to verify if the pulled information looks sane if True.
 """
-def get_accounts(authtoken, url, customFilter='all', verifyUser=False):
+def get_from_api(authtoken, url, verifyUser=False, endpoint):
     headers = {"Authorization":"Bearer {0}".format(authtoken)}
-    logging.info('Generating a list of accounts from {0}...'.format(url))
+    logging.info('Generating a list of {0} from {1}...'.format(endpoint, url))
     # Make the request
     try:
         r = requests.get(
-            '{0}/accounts/?filter={1}&limit=1000'.format(url, customFilter),
+            '{0}/{1}/?filter=all&limit=1000'.format(url, endpoint),
             headers=headers,
             verify=False
         )
     except requests.exceptions.RequestException as e:
         logging.error('Failed to get account list for UCP {0}: {1}'.format(url, e))
         retries+=1
-        retry_this('UCP', 10, retries, 3, get_accounts(authtoken, url, customFilter, verifyUser))
+        retry_this('UCP', 10, retries, 3, get_accounts(authtoken, url, verifyUser, endpoint))
     logging.info('Getting ready to import the following accounts:\n{}'.format(r.text))
-    # Using the captured information send a list of captured accounts out to
+    # Using the captured information send a list of captured info out to
     # the user
     a = json.loads(r.text)
     if verifyUser:
         choice = yes_no('Does this appear correct')
         if choice:
             # proceed
-            logging.info('Accepted given accounts list, continuing...')
+            logging.info('Accepted given {0} list, continuing...'.format(endpoint))
             return a
         if not choice:
             # exit
-            logging.error('Accounts list does not appear correct, exiting.')
+            logging.error('{0} list does not appear correct, exiting.'.format(endpoint))
             sys.exit(1)
     else:
-        logging.info('verifyUser flag False, skipping account list verification...')
+        logging.info('verifyUser flag False, skipping {0} list verification...'.format(endpoint))
         return a
 
 """
@@ -170,6 +167,17 @@ def import_accounts(authtoken, url, accountsJson, userPassword='changeme'):
     logging.info('All accounts successfully imported')
 
 """
+Import a given JSON dump of collections data into a given UCP URL.
+"""
+def import_collections(authtoken, url, collectionsJson):
+    headers = {
+        "Authorization":"Bearer {0}".format(authtoken),
+        "Content-Type":"application/json"
+    }
+    logging.info('Importing collections to {0}'.format(url))
+    # Iterate through the collections and import each one
+
+"""
 Given a UCP url, authtoken, and two json dumps, one which is the staleJson
 obtained from get_accounts() and the second which is freshly obtained using
 the authtoken against the UCP where import_accounts() was just ran, diff the
@@ -193,7 +201,9 @@ def verify_import(authtoken, url, staleJson, customFilter='all'):
 def main():
     # argument parsing
     parser = argparse.ArgumentParser(description='Generate a list of current \
-            accounts from a given Docker UCP and copy them over to a new UCP.')
+            accounts and their associated collections from a given Docker UCP \
+            and copy them over to a new UCP.  Should only be used on Docker \
+            UCP versions 2.2 and above.')
     parser.add_argument("-i",
                         "--interactive",
                         dest="interactiveMode",
@@ -229,7 +239,6 @@ def main():
                         dest="debug",
                         action="store_true",
                         help="Enable debugging")
-    #TODO: Implement customFilter support
 
     args = parser.parse_args()
 
@@ -314,7 +323,7 @@ def main():
     # Get an auth token against the --from UCP
     ucpOneAuthtoken = get_token(args.ucpUserOne, args.ucpPasswordOne, args.ucpOne)
     # Get a list of accounts against the --from UCP
-    ucpOneAccountJson = get_accounts(ucpOneAuthtoken, args.ucpOne, verifyUser=verify)
+    ucpOneAccountJson = get_from_api(ucpOneAuthtoken, args.ucpOne, verifyUser=verify, accounts)
     # Get an auth token against the --to UCP
     ucpTwoAuthToken = get_token(args.ucpUserTwo, args.ucpPasswordTwo, args.ucpTwo)
     # Import accounts into the --to UCP
