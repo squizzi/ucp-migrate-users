@@ -76,7 +76,7 @@ def get_token(username, password, url, retries=0):
     except requests.exceptions.RequestException as e:
         logging.error('Failed to authenticate with UCP {0}: {1}'.format(url, e))
         retries+=1
-        retry_this('UCP', 10, retries, 3, get_token(username, password, url))
+        retry_this('UCP', 10, retries, 3, get_token(username, password, url, retries))
     logging.debug('Got response: {}'.format(r.text))
     if "unauthorized" in r.text:
         logging.error('Unable to authenticate with UCP {}, are the admin credentials correct?'.format(url))
@@ -96,20 +96,20 @@ we will just pull 'all'.
 
 Then, ask the user to verify if the pulled information looks sane if True.
 """
-def get_accounts(authtoken, url, customFilter='all', verifyUser=False):
+def get_accounts(authtoken, url, verifyUser=False, retries=0):
     headers = {"Authorization":"Bearer {0}".format(authtoken)}
     logging.info('Generating a list of accounts from {0}...'.format(url))
     # Make the request
     try:
         r = requests.get(
-            '{0}/accounts/?filter={1}&limit=1000'.format(url, customFilter),
+            '{0}/accounts/?limit=1000'.format(url),
             headers=headers,
             verify=False
         )
     except requests.exceptions.RequestException as e:
         logging.error('Failed to get account list for UCP {0}: {1}'.format(url, e))
         retries+=1
-        retry_this('UCP', 10, retries, 3, get_accounts(authtoken, url, customFilter, verifyUser))
+        retry_this('UCP', 10, retries, 3, get_accounts(authtoken, url, verifyUser, retries))
     logging.info('Getting ready to import the following accounts:\n{}'.format(r.text))
     # Using the captured information send a list of captured accounts out to
     # the user
@@ -132,7 +132,7 @@ def get_accounts(authtoken, url, customFilter='all', verifyUser=False):
 Import a given JSON dump of accounts into a given UCP URL.  Give users a
 default password of 'changeme'.  Password is configurable.
 """
-def import_accounts(authtoken, url, accountsJson, userPassword='changeme'):
+def import_accounts(authtoken, url, accountsJson, userPassword='changeme', retries=0):
     headers = {
         "Authorization":"Bearer {0}".format(authtoken),
         "Content-Type":"application/json"
@@ -158,7 +158,7 @@ def import_accounts(authtoken, url, accountsJson, userPassword='changeme'):
         except requests.exceptions.RequestException as e:
             logging.error('Failed to add {0} account to UCP {1}: {2}'.format(accountName, url, e))
             retries+=1
-            retry_this('UCP', 10, retries, 3, import_accounts(authtoken, url, accountsJson))
+            retry_this('UCP', 10, retries, 3, import_accounts(authtoken, url, accountsJson, retries))
         # If the account already exists just pass, but tell the user
         if "ACCOUNT_EXISTS" in r.text:
             logging.info('Cannot import {0}, account already exists'.format(accountName))
@@ -169,26 +169,7 @@ def import_accounts(authtoken, url, accountsJson, userPassword='changeme'):
         x+=1
     logging.info('All accounts successfully imported')
 
-"""
-Given a UCP url, authtoken, and two json dumps, one which is the staleJson
-obtained from get_accounts() and the second which is freshly obtained using
-the authtoken against the UCP where import_accounts() was just ran, diff the
-json dumps to ensure all accounts were actually copied over.
-"""
-##FIXME: This is currently unreliable, need to fix this for a future release
-def verify_import(authtoken, url, staleJson, customFilter='all'):
-    headers = {"Authorization":"Bearer {0}".format(authtoken)}
-    freshJson = get_accounts(authtoken, url, customFilter, verifyUser=False)
-    # If we detect differences then we'll log those and exit
-    # TODO: We don't really do anything more here, perhaps we can retry the
-    # differences?
-    diffedJson = diff(staleJson, freshJson)
-    if diffedJson != {}:
-        logging.error('Newly imported accounts list on {0} does not match existing {1} list'.format(url, customFilter))
-        logging.debug(diffedJson)
-        return False
-    else:
-        return True
+#TODO verify account import?
 
 def main():
     # argument parsing
@@ -229,7 +210,6 @@ def main():
                         dest="debug",
                         action="store_true",
                         help="Enable debugging")
-    #TODO: Implement customFilter support
 
     args = parser.parse_args()
 

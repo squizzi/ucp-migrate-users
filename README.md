@@ -1,4 +1,4 @@
-# ucp-migrate-users:1.0.1
+# ucp-migrate-users:1.0.2
 Generate a list of current accounts from a given Docker UCP and copy them
 over to a new UCP.
 
