@@ -76,7 +76,7 @@ def get_token(username, password, url, retries=0):
     except requests.exceptions.RequestException as e:
         logging.error('Failed to authenticate with UCP {0}: {1}'.format(url, e))
         retries+=1
-        retry_this('UCP', 10, retries, 3, get_token(username, password, url))
+        retry_this('UCP', 10, retries, 3, get_token(username, password, url, retries))
     logging.debug('Got response: {}'.format(r.text))
     if "unauthorized" in r.text:
         logging.error('Unable to authenticate with UCP {}, are the admin credentials correct?'.format(url))
@@ -93,20 +93,20 @@ def get_token(username, password, url, retries=0):
 Get a JSON dump of a specific API endpoint from a given UCP URL. Then, ask the
 user to verify if the pulled information looks sane if True.
 """
-def get_from_api(authtoken, url, verifyUser=False, endpoint):
+def get_from_api(authtoken, url, endpoint, verifyUser=False):
     headers = {"Authorization":"Bearer {0}".format(authtoken)}
     logging.info('Generating a list of {0} from {1}...'.format(endpoint, url))
     # Make the request
     try:
         r = requests.get(
-            '{0}/{1}/?filter=all&limit=1000'.format(url, endpoint),
+            '{0}/{1}?limit=1000'.format(url, endpoint),
             headers=headers,
             verify=False
         )
     except requests.exceptions.RequestException as e:
         logging.error('Failed to get account list for UCP {0}: {1}'.format(url, e))
         retries+=1
-        retry_this('UCP', 10, retries, 3, get_accounts(authtoken, url, verifyUser, endpoint))
+        retry_this('UCP', 10, retries, 3, get_accounts(authtoken, url, endpoint, verifyUser))
     logging.info('Getting ready to import the following accounts:\n{}'.format(r.text))
     # Using the captured information send a list of captured info out to
     # the user
@@ -176,6 +176,23 @@ def import_collections(authtoken, url, collectionsJson):
     }
     logging.info('Importing collections to {0}'.format(url))
     # Iterate through the collections and import each one
+    for x in range(len(collectionsJson[])):
+        toImport = collectionsJson[x]
+        try:
+            r = requests.post(
+            url+'/accounts/',
+            headers=headers,
+            data=json.dumps(toImport)
+            )
+        except requests.exceptions.RequestException as e:
+            logging.error('Failed to add {0} collection to UCP {1}: {2}'.format(toImport, url, e))
+            retries+=1
+            retry_this('UCP', 10, retries, 3, import_accounts(authtoken, url, collectionsJson))
+
+"""
+Import a given JSON  dump of collectionGrants into a given UCP URL.
+"""
+
 
 """
 Given a UCP url, authtoken, and two json dumps, one which is the staleJson
