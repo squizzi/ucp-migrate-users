@@ -1,10 +1,13 @@
-FROM jfloff/alpine-python:2.7-slim
+FROM docker:19-dind
 
 MAINTAINER Kyle Squizzato: 'kyle.squizzato@docker.com'
 
 WORKDIR /
 
-RUN pip install --upgrade \
+RUN apk update && apk add python3
+RUN python3 -m ensurepip
+RUN pip3 install --upgrade \
+    docker \
     pip \
     requests \
     colored \
@@ -13,4 +16,4 @@ RUN pip install --upgrade \
 
 COPY ./migrate.py /
 
-ENTRYPOINT ["python", "./migrate.py"]
+ENTRYPOINT ["python3", "./migrate.py"]
